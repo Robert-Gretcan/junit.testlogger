@@ -176,6 +176,58 @@ namespace Microsoft.VisualStudio.TestPlatform.Extension.Junit.Xml.TestLogger
                               .Select(x => x.Trim())));
         }
 
+        private static XElement CreatePropertiesElement(TestResultInfo result)
+        {
+            var propertyElements = new HashSet<XElement>(result.Traits.Select(CreatePropertyElement));
+
+#pragma warning disable CS0618 // Type or member is obsolete
+
+            // Required since TestCase.Properties is a superset of TestCase.Traits
+            // Unfortunately not all NUnit properties are available as traits
+            var traitProperties = result.Properties;
+
+#pragma warning restore CS0618 // Type or member is obsolete
+
+            foreach (var p in traitProperties)
+            {
+                if (p.Key == "NUnit.TestCategory")
+                {
+                    var propValue = p.Value;
+                    var elements = CreatePropertyElement("Category", (string[])propValue);
+
+                    foreach (var element in elements)
+                    {
+                        propertyElements.Add(element);
+                    }
+                }
+            }
+
+            return propertyElements.Any()
+                ? new XElement("properties", propertyElements.Distinct())
+                : null;
+        }
+
+        private static XElement CreatePropertyElement(Trait trait)
+        {
+            return CreatePropertyElement(trait.Name, trait.Value).Single();
+        }
+
+        private static IEnumerable<XElement> CreatePropertyElement(string name, params string[] values)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new ArgumentException("message", nameof(name));
+            }
+
+            foreach (var value in values)
+            {
+                yield return new XElement(
+                "property",
+                new XAttribute("name", name),
+                new XAttribute("value", value));
+            }
+        }
+
         private XElement CreateTestSuitesElement(
             List<TestResultInfo> results,
             TestRunConfiguration runConfiguration,
@@ -309,6 +361,9 @@ namespace Microsoft.VisualStudio.TestPlatform.Extension.Junit.Xml.TestLogger
 
                 testcaseElement.Add(skippedElement);
             }
+
+            // Adding properties to test case element
+            testcaseElement.Add(CreatePropertiesElement(result));
 
             return testcaseElement;
         }
