@@ -280,12 +280,9 @@ namespace Microsoft.VisualStudio.TestPlatform.Extension.Junit.Xml.TestLogger
             var element = new XElement(
                 "testsuite",
                 new XElement("properties"),
-                testCaseElements,
-                new XElement("system-out", stdOut.ToString()),
-                new XElement("system-err", stdErr.ToString()));
+                testCaseElements);
 
             element.SetAttributeValue("name", Path.GetFileName(results.First().AssemblyPath));
-
             element.SetAttributeValue("tests", results.Count);
             element.SetAttributeValue("skipped", results.Where(x => x.Outcome == TestOutcome.Skipped).Count());
             element.SetAttributeValue("failures", results.Where(x => x.Outcome == TestOutcome.Failed).Count());
@@ -302,7 +299,6 @@ namespace Microsoft.VisualStudio.TestPlatform.Extension.Junit.Xml.TestLogger
         private XElement CreateTestCaseElement(TestResultInfo result)
         {
             var testcaseElement = new XElement("testcase");
-
             var namespaceClass = result.Namespace + "." + result.Type;
 
             testcaseElement.SetAttributeValue("classname", namespaceClass);
@@ -329,7 +325,7 @@ namespace Microsoft.VisualStudio.TestPlatform.Extension.Junit.Xml.TestLogger
             if (result.Outcome == TestOutcome.Failed)
             {
                 var failureBodySB = new StringBuilder();
-
+                StringBuilder stdOut = new StringBuilder();
                 if (this.FailureBodyFormatOption == FailureBodyFormat.Verbose)
                 {
                     failureBodySB.AppendLine(result.ErrorMessage);
@@ -354,6 +350,17 @@ namespace Microsoft.VisualStudio.TestPlatform.Extension.Junit.Xml.TestLogger
                 failureElement.SetAttributeValue("message", result.ErrorMessage);
 
                 testcaseElement.Add(failureElement);
+
+                foreach (var message in result.Messages)
+                {
+                    if (TestResultMessage.StandardOutCategory.Equals(message.Category, StringComparison.OrdinalIgnoreCase))
+                    {
+                        stdOut.AppendLine(message.Text);
+                    }
+                }
+
+                var stdElement = new XElement("system-out", stdOut.ToString().Trim());
+                testcaseElement.Add(stdElement);
             }
             else if (result.Outcome == TestOutcome.Skipped)
             {
